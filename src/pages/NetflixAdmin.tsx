@@ -1,126 +1,175 @@
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { MainLayout } from "@/components/layout/MainLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { CredentialsPanel } from "@/components/admin/CredentialsPanel";
 import { SlotsPanel } from "@/components/admin/SlotsPanel";
 import { ReferralsPanel } from "@/components/admin/ReferralsPanel";
+import { TokenGenerator } from "@/components/admin/TokenGenerator";
 import { TransactionsPanel } from "@/components/admin/TransactionsPanel";
-import { UIConfigPanel } from "@/components/admin/UIConfigPanel";
-import { UsersPanel } from "@/components/admin/UsersPanel";
-import { Loader2 } from "lucide-react";
-import { fetchNetflixData, subscribeToNetflixData } from "@/lib/firebaseService";
-import { DatabaseSchema } from "@/types/database";
-import { toast } from "sonner";
+import { ScreenConfigPanel } from "@/components/admin/ScreenConfigPanel";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { LogOut, Loader2 } from "lucide-react";
+import { subscribeToNetflixData } from "@/lib/firebase-netflix";
 
 export default function NetflixAdmin() {
-  const [loading, setLoading] = useState(true);
-  const [dbData, setDbData] = useState<DatabaseSchema | null>(null);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      // Initial data load
-      const data = await fetchNetflixData("/");
-      setDbData(data);
-      toast.success("Netflix database loaded successfully");
-      
-      // Set up real-time listener
-      unsubscribeRef.current = subscribeToNetflixData("/", (realtimeData) => {
-        if (realtimeData) {
-          setDbData(realtimeData);
-        }
-      });
-    } catch (error) {
-      console.error("Error loading Netflix database:", error);
-      toast.error("Failed to load Netflix database");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState("credentials");
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
+    setIsLoading(true);
     
-    // Cleanup function
+    // Set up listeners for all the data we need
+    const unsubscribeAdminConfig = subscribeToNetflixData("/admin_config", (adminConfig) => {
+      setData((prev: any) => ({ ...prev, adminConfig }));
+    });
+    
+    const unsubscribeSlots = subscribeToNetflixData("/settings/slots", (slots) => {
+      setData((prev: any) => ({ ...prev, slots }));
+    });
+    
+    const unsubscribeCredentials = subscribeToNetflixData("/", (credentials) => {
+      // Filter out non-credential data
+      const filteredCredentials: any = {};
+      Object.entries(credentials).forEach(([key, value]) => {
+        if (key.startsWith("cred") && typeof value === "object") {
+          filteredCredentials[key] = value;
+        }
+      });
+      setData((prev: any) => ({ ...prev, credentials: filteredCredentials }));
+    });
+    
+    const unsubscribeReferrals = subscribeToNetflixData("/referrals", (referrals) => {
+      setData((prev: any) => ({ ...prev, referrals }));
+    });
+    
+    const unsubscribeReferralSettings = subscribeToNetflixData("/referral_settings", (referralSettings) => {
+      setData((prev: any) => ({ ...prev, referralSettings }));
+    });
+    
+    const unsubscribeTransactions = subscribeToNetflixData("/transactions", (transactions) => {
+      setData((prev: any) => ({ ...prev, transactions }));
+    });
+    
+    const unsubscribeOrderIds = subscribeToNetflixData("/used_order_ids", (usedOrderIds) => {
+      setData((prev: any) => ({ ...prev, usedOrderIds }));
+    });
+    
+    const unsubscribeFreeTrialClaims = subscribeToNetflixData("/free_trial_claims", (freeTrialClaims) => {
+      setData((prev: any) => ({ ...prev, freeTrialClaims }));
+    });
+    
+    // Once we have all subscriptions set up, mark as not loading
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
+      // Clean up all subscriptions
+      unsubscribeAdminConfig();
+      unsubscribeSlots();
+      unsubscribeCredentials();
+      unsubscribeReferrals();
+      unsubscribeReferralSettings();
+      unsubscribeTransactions();
+      unsubscribeOrderIds();
+      unsubscribeFreeTrialClaims();
     };
-  }, [loadData]);
+  }, []);
 
-  if (loading) {
-    return <MainLayout className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
-          <h2 className="text-xl font-medium">Loading Netflix database...</h2>
-        </div>
-      </MainLayout>;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg">Loading Netflix admin panel...</p>
+      </div>
+    );
   }
 
-  if (!dbData) {
-    return <MainLayout>
-        <div className="glass-morphism p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">Database Error</h2>
-          <p className="text-red-400">Failed to load Netflix database. Please check your connection and try again.</p>
-        </div>
-      </MainLayout>;
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-lg text-red-500">Failed to load data</p>
+        <Button onClick={() => window.location.reload()} className="mt-4">
+          Retry
+        </Button>
+      </div>
+    );
   }
 
-  return <MainLayout>
-      <div className="space-y-8">
-        <Tabs defaultValue="admin" className="w-full">
-          <TabsList className="w-full mb-6 grid grid-cols-2 md:grid-cols-7 h-auto p-1 glass-morphism shadow-lg">
-            <TabsTrigger className="py-2.5 text-sm font-medium transition-all hover:bg-white/10" value="admin">Admins</TabsTrigger>
-            <TabsTrigger className="py-2.5 text-sm font-medium transition-all hover:bg-white/10" value="credentials">Credentials</TabsTrigger>
-            <TabsTrigger className="py-2.5 text-sm font-medium transition-all hover:bg-white/10" value="slots">Slots</TabsTrigger>
-            <TabsTrigger className="py-2.5 text-sm font-medium transition-all hover:bg-white/10" value="referrals">Referrals</TabsTrigger>
-            <TabsTrigger className="py-2.5 text-sm font-medium transition-all hover:bg-white/10" value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger className="py-2.5 text-sm font-medium transition-all hover:bg-white/10" value="uiconfig">UI Config</TabsTrigger>
-            <TabsTrigger className="py-2.5 text-sm font-medium transition-all hover:bg-white/10" value="users">Users</TabsTrigger>
-          </TabsList>
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-16 items-center px-4 sm:px-6">
+          <div className="flex items-center gap-2">
+            <Logo service="netflix" size="md" />
+            <h1 className="text-xl font-bold">Netflix Admin</h1>
+          </div>
           
-          <TabsContent value="admin" className="mt-0">
-            <AdminPanel adminConfig={dbData.admin_config} />
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
+            <Button variant="ghost" size="icon" onClick={logout}>
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </header>
+      
+      <main className="container py-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <div className="overflow-auto">
+            <TabsList className="inline-flex w-full md:w-auto">
+              <TabsTrigger value="credentials">Credentials</TabsTrigger>
+              <TabsTrigger value="slots">Slots</TabsTrigger>
+              <TabsTrigger value="referrals">Referrals</TabsTrigger>
+              <TabsTrigger value="screen">Screen Config</TabsTrigger>
+              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+              <TabsTrigger value="admin">Admin</TabsTrigger>
+              <TabsTrigger value="tools">Tools</TabsTrigger>
+            </TabsList>
+          </div>
+          
+          <TabsContent value="credentials" className="space-y-6">
+            <CredentialsPanel credentials={data.credentials} slots={data.slots} />
           </TabsContent>
           
-          <TabsContent value="credentials" className="mt-0">
-            <CredentialsPanel credentials={{
-              cred1: dbData.cred1,
-              cred2: dbData.cred2,
-              cred3: dbData.cred3,
-              cred4: dbData.cred4,
-              ...Object.fromEntries(
-                Object.entries(dbData)
-                  .filter(([key]) => key.startsWith('cred') && !['cred1', 'cred2', 'cred3', 'cred4'].includes(key))
-                  .map(([key, value]) => [key, value])
-              )
-            }} slots={dbData.settings.slots} />
+          <TabsContent value="slots" className="space-y-6">
+            <SlotsPanel slots={data.slots} />
           </TabsContent>
           
-          <TabsContent value="slots" className="mt-0">
-            <SlotsPanel slots={dbData.settings.slots} />
+          <TabsContent value="referrals" className="space-y-6">
+            <ReferralsPanel 
+              referrals={data.referrals} 
+              referralSettings={data.referralSettings} 
+              freeTrialClaims={data.freeTrialClaims} 
+            />
           </TabsContent>
           
-          <TabsContent value="referrals" className="mt-0">
-            <ReferralsPanel referrals={dbData.referrals} referralSettings={dbData.referral_settings} freeTrialClaims={dbData.free_trial_claims} />
+          <TabsContent value="screen" className="space-y-6">
+            <ScreenConfigPanel service="netflix" />
           </TabsContent>
           
-          <TabsContent value="transactions" className="mt-0">
-            <TransactionsPanel transactions={dbData.transactions} usedOrderIds={dbData.used_orderids} />
+          <TabsContent value="transactions" className="space-y-6">
+            <TransactionsPanel 
+              transactions={data.transactions} 
+              usedOrderIds={data.usedOrderIds} 
+            />
           </TabsContent>
           
-          <TabsContent value="uiconfig" className="mt-0">
-            <UIConfigPanel uiConfig={dbData.ui_config} />
+          <TabsContent value="admin" className="space-y-6">
+            <AdminPanel adminConfig={data.adminConfig} />
           </TabsContent>
           
-          <TabsContent value="users" className="mt-0">
-            <UsersPanel users={dbData.users} />
+          <TabsContent value="tools" className="space-y-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <TokenGenerator />
           </TabsContent>
         </Tabs>
-      </div>
-    </MainLayout>;
+      </main>
+    </div>
+  );
 }
