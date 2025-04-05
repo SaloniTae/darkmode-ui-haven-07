@@ -3,22 +3,37 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
-  icon: ReactNode;
   title: string;
   description?: string;
+  icon?: ReactNode;
   action?: ReactNode;
   className?: string;
 }
 
-export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({ 
+  title, 
+  description, 
+  icon, 
+  action,
+  className 
+}: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center space-y-3 py-12 text-center", className)}>
-      <div className="text-muted-foreground/50 h-16 w-16 flex items-center justify-center rounded-full bg-muted/20">
-        {icon}
-      </div>
-      <h3 className="text-lg font-semibold">{title}</h3>
-      {description && <p className="text-sm text-muted-foreground max-w-md">{description}</p>}
-      {action && <div className="pt-2">{action}</div>}
+    <div 
+      className={cn(
+        "flex flex-col items-center justify-center text-center p-8 rounded-lg glass-morphism",
+        className
+      )}
+    >
+      {icon && (
+        <div className="mb-4 text-primary/60 animate-float">
+          {icon}
+        </div>
+      )}
+      <h3 className="text-xl font-medium mb-2">{title}</h3>
+      {description && (
+        <p className="text-muted-foreground max-w-sm mb-6">{description}</p>
+      )}
+      {action}
     </div>
   );
 }

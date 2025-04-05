@@ -1,10 +1,8 @@
 
-// Firebase configuration for Netflix
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, get, update, remove, onValue } from "firebase/database";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getDatabase, ref, get, set, remove, update, onValue, off } from "firebase/database";
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration for Netflix
 const firebaseConfig = {
   apiKey: "AIzaSyBfN12Ig49lgQ4XoadRrJCn6FMMJ_PfTfI",
   authDomain: "get-accounts-netflix-prime.firebaseapp.com",
@@ -16,75 +14,43 @@ const firebaseConfig = {
   measurementId: "G-MWPBL89RR7"
 };
 
-// Initialize Firebase for Netflix with a unique name to avoid conflicts
+// Initialize Firebase for Netflix
 const netflixApp = initializeApp(firebaseConfig, "netflix");
-const netflixDb = getDatabase(netflixApp);
-const netflixAuth = getAuth(netflixApp);
+export const netflixDatabase = getDatabase(netflixApp);
 
-/**
- * Gets data from Netflix Firebase
- * @param path - The path to the data
- * @returns Promise with the data snapshot
- */
-export const getNetflixData = async (path: string) => {
-  const dataRef = ref(netflixDb, path);
+// Database helper functions for Netflix
+export const fetchNetflixData = async (path: string) => {
+  const dataRef = ref(netflixDatabase, path);
   const snapshot = await get(dataRef);
-  return snapshot.val();
+  return snapshot.exists() ? snapshot.val() : null;
 };
 
-/**
- * Sets data in Netflix Firebase
- * @param path - The path to set the data
- * @param data - The data to set
- * @returns Promise that resolves when the data is set
- */
-export const setNetflixData = async (path: string, data: any) => {
-  const dataRef = ref(netflixDb, path);
-  return set(dataRef, data);
-};
-
-/**
- * Updates data in Netflix Firebase
- * @param path - The path to update the data
- * @param data - The data to update
- * @returns Promise that resolves when the data is updated
- */
 export const updateNetflixData = async (path: string, data: any) => {
-  const dataRef = ref(netflixDb, path);
-  return update(dataRef, data);
+  const dataRef = ref(netflixDatabase, path);
+  await update(dataRef, data);
+  return data;
 };
 
-/**
- * Removes data from Netflix Firebase
- * @param path - The path to the data to remove
- * @returns Promise that resolves when the data is removed
- */
+export const setNetflixData = async (path: string, data: any) => {
+  const dataRef = ref(netflixDatabase, path);
+  await set(dataRef, data);
+  return data;
+};
+
 export const removeNetflixData = async (path: string) => {
-  const dataRef = ref(netflixDb, path);
-  return remove(dataRef);
+  const dataRef = ref(netflixDatabase, path);
+  await remove(dataRef);
+  return true;
 };
 
-/**
- * Listens for data changes in Netflix Firebase
- * @param path - The path to listen to
- * @param callback - The callback to call when the data changes
- * @returns The unsubscribe function
- */
+// Realtime listener functions for Netflix
 export const subscribeToNetflixData = (path: string, callback: (data: any) => void) => {
-  const dataRef = ref(netflixDb, path);
-  return onValue(dataRef, (snapshot) => {
-    callback(snapshot.val());
+  const dataRef = ref(netflixDatabase, path);
+  onValue(dataRef, (snapshot) => {
+    const data = snapshot.exists() ? snapshot.val() : null;
+    callback(data);
   });
+  
+  // Return unsubscribe function
+  return () => off(dataRef);
 };
-
-/**
- * Signs in to Netflix Firebase
- * @param email - The email to sign in with
- * @param password - The password to sign in with
- * @returns Promise with the user credentials
- */
-export const signInNetflix = async (email: string, password: string) => {
-  return await signInWithEmailAndPassword(netflixAuth, email, password);
-};
-
-export default netflixDb;

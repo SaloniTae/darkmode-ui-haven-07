@@ -1,10 +1,8 @@
 
-// Firebase configuration for Crunchyroll
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, get, update, remove, onValue } from "firebase/database";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getDatabase, ref, get, set, remove, update, onValue, off } from "firebase/database";
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration for Crunchyroll
 const firebaseConfig = {
   apiKey: "AIzaSyA2pIQ4la9Pgzg3uDe-iN5k3w_kahiXYkw",
   authDomain: "get-crunchy-credentials.firebaseapp.com",
@@ -16,75 +14,43 @@ const firebaseConfig = {
   measurementId: "G-5XKQEDN0GW"
 };
 
-// Initialize Firebase for Crunchyroll
-const crunchyrollApp = initializeApp(firebaseConfig);
-const crunchyrollDb = getDatabase(crunchyrollApp);
-const crunchyrollAuth = getAuth(crunchyrollApp);
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+export const database = getDatabase(app);
 
-/**
- * Gets data from Crunchyroll Firebase
- * @param path - The path to the data
- * @returns Promise with the data snapshot
- */
-export const getData = async (path: string) => {
-  const dataRef = ref(crunchyrollDb, path);
+// Database helper functions
+export const fetchData = async (path: string) => {
+  const dataRef = ref(database, path);
   const snapshot = await get(dataRef);
-  return snapshot.val();
+  return snapshot.exists() ? snapshot.val() : null;
 };
 
-/**
- * Sets data in Crunchyroll Firebase
- * @param path - The path to set the data
- * @param data - The data to set
- * @returns Promise that resolves when the data is set
- */
-export const setData = async (path: string, data: any) => {
-  const dataRef = ref(crunchyrollDb, path);
-  return set(dataRef, data);
-};
-
-/**
- * Updates data in Crunchyroll Firebase
- * @param path - The path to update the data
- * @param data - The data to update
- * @returns Promise that resolves when the data is updated
- */
 export const updateData = async (path: string, data: any) => {
-  const dataRef = ref(crunchyrollDb, path);
-  return update(dataRef, data);
+  const dataRef = ref(database, path);
+  await update(dataRef, data);
+  return data;
 };
 
-/**
- * Removes data from Crunchyroll Firebase
- * @param path - The path to the data to remove
- * @returns Promise that resolves when the data is removed
- */
+export const setData = async (path: string, data: any) => {
+  const dataRef = ref(database, path);
+  await set(dataRef, data);
+  return data;
+};
+
 export const removeData = async (path: string) => {
-  const dataRef = ref(crunchyrollDb, path);
-  return remove(dataRef);
+  const dataRef = ref(database, path);
+  await remove(dataRef);
+  return true;
 };
 
-/**
- * Listens for data changes in Crunchyroll Firebase
- * @param path - The path to listen to
- * @param callback - The callback to call when the data changes
- * @returns The unsubscribe function
- */
+// Realtime listener functions
 export const subscribeToData = (path: string, callback: (data: any) => void) => {
-  const dataRef = ref(crunchyrollDb, path);
-  return onValue(dataRef, (snapshot) => {
-    callback(snapshot.val());
+  const dataRef = ref(database, path);
+  onValue(dataRef, (snapshot) => {
+    const data = snapshot.exists() ? snapshot.val() : null;
+    callback(data);
   });
+  
+  // Return unsubscribe function
+  return () => off(dataRef);
 };
-
-/**
- * Signs in to Crunchyroll Firebase
- * @param email - The email to sign in with
- * @param password - The password to sign in with
- * @returns Promise with the user credentials
- */
-export const signIn = async (email: string, password: string) => {
-  return await signInWithEmailAndPassword(crunchyrollAuth, email, password);
-};
-
-export default crunchyrollDb;

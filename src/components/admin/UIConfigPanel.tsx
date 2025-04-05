@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { UIConfig } from "@/types/database";
+import { UIConfig, CrunchyrollScreen, NetflixPrimeScreen } from "@/types/database";
 import { DataCard } from "@/components/ui/DataCard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Edit, Save, Image, Plus, Trash } from "lucide-react";
-import { updateData } from "@/lib/firebase";
+import { updateData } from "@/lib/firebaseService";
+import { updatePrimeData } from "@/lib/firebaseService";
+import { updateNetflixData } from "@/lib/firebaseService";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
 
@@ -23,9 +25,23 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
 
   const isNetflixOrPrime = location.pathname.includes("netflix") || location.pathname.includes("prime");
 
+  useEffect(() => {
+    setEditedConfig({ ...uiConfig });
+  }, [uiConfig]);
+
+  const getUpdateFunction = () => {
+    if (location.pathname.includes("netflix")) {
+      return updateNetflixData;
+    } else if (location.pathname.includes("prime")) {
+      return updatePrimeData;
+    }
+    return updateData; // Default for Crunchyroll
+  };
+
   const handleSaveChanges = async () => {
     try {
-      await updateData("/ui_config", editedConfig);
+      const updateFn = getUpdateFunction();
+      await updateFn("/ui_config", editedConfig);
       toast.success("UI configuration updated successfully");
       setIsEditing(false);
     } catch (error) {
@@ -285,7 +301,7 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
                         <Label htmlFor="cr-gif">GIF URL</Label>
                         <Input
                           id="cr-gif"
-                          value={(editedConfig.crunchyroll_screen as any).gif_url || ""}
+                          value={(editedConfig.crunchyroll_screen as NetflixPrimeScreen).gif_url || ""}
                           onChange={(e) => handleInputChange('crunchyroll_screen', 'gif_url', e.target.value)}
                         />
                       </>
@@ -294,7 +310,7 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
                         <Label htmlFor="cr-photo">Photo URL</Label>
                         <Input
                           id="cr-photo"
-                          value={(editedConfig.crunchyroll_screen as any).photo_url || ""}
+                          value={(editedConfig.crunchyroll_screen as CrunchyrollScreen).photo_url || ""}
                           onChange={(e) => handleInputChange('crunchyroll_screen', 'photo_url', e.target.value)}
                         />
                       </>
@@ -336,8 +352,8 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
                       <div className="relative aspect-video bg-black/20 rounded overflow-hidden">
                         <img 
                           src={isNetflixOrPrime ? 
-                            (editedConfig.crunchyroll_screen as any).gif_url : 
-                            (editedConfig.crunchyroll_screen as any).photo_url}
+                            (editedConfig.crunchyroll_screen as NetflixPrimeScreen).gif_url : 
+                            (editedConfig.crunchyroll_screen as CrunchyrollScreen).photo_url}
                           alt="Crunchyroll Screen"
                           className="absolute inset-0 w-full h-full object-cover object-center"
                           onError={(e) => {
