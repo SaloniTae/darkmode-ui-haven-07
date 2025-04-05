@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { UIConfig, CrunchyrollScreen, NetflixPrimeScreen } from "@/types/database";
 import { DataCard } from "@/components/ui/DataCard";
@@ -25,6 +26,7 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
 
   const isNetflixOrPrime = location.pathname.includes("netflix") || location.pathname.includes("prime");
 
+  // Update edited config when uiConfig prop changes
   useEffect(() => {
     setEditedConfig({ ...uiConfig });
   }, [uiConfig]);
@@ -149,6 +151,23 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
     });
   };
 
+  // Function to get the correct media URL based on service type
+  const getMediaUrl = (screen: CrunchyrollScreen | NetflixPrimeScreen): string => {
+    if (isNetflixOrPrime) {
+      return (screen as NetflixPrimeScreen).gif_url || "";
+    } else {
+      return (screen as CrunchyrollScreen).photo_url || "";
+    }
+  };
+
+  // This key helps force re-render of images when URLs change
+  const [imageKey, setImageKey] = useState(Date.now());
+  
+  // Force re-render of images when edited config changes
+  useEffect(() => {
+    setImageKey(Date.now());
+  }, [editedConfig]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -252,6 +271,7 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
                     <div className="glass-morphism p-2 rounded-md overflow-hidden">
                       <div className="relative aspect-video bg-black/20 rounded overflow-hidden">
                         <img 
+                          key={`welcome-photo-${imageKey}`}
                           src={editedConfig.start_command.welcome_photo}
                           alt="Welcome"
                           className="absolute inset-0 w-full h-full object-cover object-center"
@@ -351,9 +371,8 @@ export function UIConfigPanel({ uiConfig }: UIConfigPanelProps) {
                     <div className="glass-morphism p-2 rounded-md overflow-hidden">
                       <div className="relative aspect-video bg-black/20 rounded overflow-hidden">
                         <img 
-                          src={isNetflixOrPrime ? 
-                            (editedConfig.crunchyroll_screen as NetflixPrimeScreen).gif_url : 
-                            (editedConfig.crunchyroll_screen as CrunchyrollScreen).photo_url}
+                          key={`crunchyroll-media-${imageKey}`}
+                          src={getMediaUrl(editedConfig.crunchyroll_screen)}
                           alt="Crunchyroll Screen"
                           className="absolute inset-0 w-full h-full object-cover object-center"
                           onError={(e) => {
